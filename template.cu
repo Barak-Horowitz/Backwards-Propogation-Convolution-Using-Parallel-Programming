@@ -69,7 +69,6 @@ __global__ void convolution(float* inputImage, float* mask,
 		}
 	}
 
-
 }
 
 int main(int argc, char *argv[]) {
@@ -133,8 +132,8 @@ int main(int argc, char *argv[]) {
   dim3 dimGrid(imageWidth / TILE_WIDTH + 1, imageHeight / TILE_WIDTH + 1);
 
   convolution<<<dimGrid, dimBlock>>>(deviceInputImageData, deviceMaskData,
-                                     deviceOutputImageData, imageChannels,
-                                     imageWidth, imageHeight);
+                                    deviceOutputImageData, imageChannels,
+                                    imageWidth, imageHeight);
   gpuTKTime_stop(Compute, "Doing the computation on the GPU");
 
   gpuTKTime_start(Copy, "Copying data from the GPU");
@@ -147,8 +146,8 @@ int main(int argc, char *argv[]) {
   gpuTKSolution(arg, outputImage);
 
   //@@ Insert code here
+ 
   cudaFree(deviceInputImageData); cudaFree(deviceOutputImageData); cudaFree(deviceMaskData);
-  free(hostInputImageData); free(hostOutputImageData); free(hostMaskData);
   gpuTKImage_delete(outputImage);
   gpuTKImage_delete(inputImage);
 
