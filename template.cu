@@ -31,7 +31,7 @@ __global__ void convolution(float* inputImage, const float* /* __restrict__ */ m
 	int currColumn = blockDimX * blockX * threadX;
 
 	//POINTS TO R VALUE OF CURRENT INDEX!!!
-	int index = (currColumn * numColumns + currRow) * numChannels;
+	int index = (currRow * numColumns + currColumn) * numChannels;
 
 	// allocate shared memory for tile, 3 represents number of channels
 	// __shared__ float currTile[TILE_WIDTH][TILE_WIDTH][3];
@@ -47,8 +47,8 @@ __global__ void convolution(float* inputImage, const float* /* __restrict__ */ m
 		// calculate final value of element
 		for(int k = 0; k < numChannels; k++) {
 			float finalVal = 0;
-			for(int x = -1 * (Mask_radius); x < Mask_radius; x++) {
-				for(int y = -1 * (Mask_radius); y < Mask_radius; y++) {
+			for(int x = -1 * (Mask_radius); x <= Mask_radius; x++) {
+				for(int y = -1 * (Mask_radius); y <= Mask_radius; y++) {
 					// current element in imageData we are looking at
 					int indexColumn = currColumn + x;
 					int indexRow = currRow + y;
@@ -65,9 +65,9 @@ __global__ void convolution(float* inputImage, const float* /* __restrict__ */ m
 							currVal = inputImage[(indexColumn * numColumns + indexRow) * numChannels + k];
 						}
 						*/
-						currVal = inputImage[(indexColumn * numColumns + indexRow) * numChannels + k];
+						currVal = inputImage[(indexRow * numColumns + indexColumn) * numChannels + k];
 					}
-					finalVal += currVal * mask[(x + Mask_radius) * Mask_width + y + Mask_radius];
+					finalVal += currVal * mask[(y + Mask_radius) * Mask_width + x + Mask_radius];
 				}
 			}
 			// output must be between 0 and 1
@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
   gpuTKTime_start(Compute, "Doing the computation on the GPU");
   //@@ INSERT CODE HERE
   dim3 dimBlock(TILE_WIDTH, TILE_WIDTH);
-  dim3 dimGrid(imageWidth / TILE_WIDTH + 1, imageHeight / TILE_WIDTH + 1);
+  dim3 dimGrid((imageWidth / TILE_WIDTH) + 1, (imageHeight / TILE_WIDTH) + 1);
 
   convolution<<<dimGrid, dimBlock>>>(deviceInputImageData, deviceMaskData,
                                     deviceOutputImageData, imageChannels,
