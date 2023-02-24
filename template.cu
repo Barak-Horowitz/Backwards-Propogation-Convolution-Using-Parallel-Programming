@@ -16,7 +16,7 @@
 #define clamp(x) (min(max((x), 0.0), 1.0))
 
 //@@ INSERT CODE HERE
-__global__ void convolution(float* inputImage, float* mask, 
+__global__ void convolution(float* inputImage, const float* /* __restrict__ */ mask, 
 			    float* outputImage, int imageChannels, int imageWidth,
 			    int imageHeight) {
 	// load important variables into registers for quick access
@@ -29,39 +29,45 @@ __global__ void convolution(float* inputImage, float* mask,
 	//calculate current row, column, and 1-D index
 	int currRow = blockDimY * blockY * threadY;
 	int currColumn = blockDimX * blockX * threadX;
+
+	//POINTS TO R VALUE OF CURRENT INDEX!!!
 	int index = (currColumn * numColumns + currRow) * numChannels;
 
-	// allocate shared memory for tile
-	__shared__ float currTile[TILE_WIDTH][TILE_WIDTH][3];
+	// allocate shared memory for tile, 3 represents number of channels
+	// __shared__ float currTile[TILE_WIDTH][TILE_WIDTH][3];
 	// check if current element is OOB- do nothing
 	if(currRow < numRows && currColumn < numColumns) {
 		// load RGB values of element into tile
-		for(int k = 0; k < numChannels; k++) {
-			currTile[threadX][threadY][k] = inputImage[index + k];
-		}
+		// for(int k = 0; k < numChannels; k++) {
+		//	currTile[threadX][threadY][k] = inputImage[index + k];
+		//}
 		//make sure entire tile is loaded before computing convolution.
-		__syncthreads();
+		//__syncthreads();
 
 		// calculate final value of element
 		for(int k = 0; k < numChannels; k++) {
 			float finalVal = 0;
-			for(int x = 0; x < Mask_width; x++) {
-				for(int y = 0; y < Mask_width; y++) {
+			for(int x = -1 * (Mask_radius); x < Mask_radius; x++) {
+				for(int y = -1 * (Mask_radius); y < Mask_radius; y++) {
 					// current element in imageData we are looking at
-					int indexColumn = currColumn + x - Mask_radius;
-					int indexRow = currRow + y - Mask_radius;
+					int indexColumn = currColumn + x;
+					int indexRow = currRow + y;
 					float currVal = 0;
 					// check if element is halo element
-					if(indexRow < numRows && indexColumn < numColumns) {
-						// check if load is from shared tile or global
+					if(indexRow < numRows && indexColumn < numColumns && indexRow >= 0 && indexColumn >= 0) {
+						/*
+						// if indexColumn, indexRow are on current tile, load from shared memory
 						if(indexRow / TILE_WIDTH == currRow / TILE_WIDTH &&
 						   indexColumn / TILE_WIDTH == currColumn / TILE_WIDTH) {
 							currVal = currTile[indexColumn % TILE_WIDTH][indexRow % TILE_WIDTH][k];
+						// else load from global memory
 						} else {
 							currVal = inputImage[(indexColumn * numColumns + indexRow) * numChannels + k];
 						}
+						*/
+						currVal = inputImage[(indexColumn * numColumns + indexRow) * numChannels + k];
 					}
-					finalVal += currVal * mask[x * Mask_width + y];
+					finalVal += currVal * mask[(x + Mask_radius) * Mask_width + y + Mask_radius];
 				}
 			}
 			// output must be between 0 and 1
@@ -123,7 +129,8 @@ int main(int argc, char *argv[]) {
   //@@ INSERT CODE HERE // cudaMemcpy device input, output SYMBOL COPY MASK
   cudaMemcpy(deviceInputImageData, hostInputImageData, imageWidth * imageHeight * imageChannels * sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(deviceOutputImageData, hostOutputImageData, imageWidth * imageHeight * imageChannels * sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(deviceMaskData, hostMaskData, maskRows * maskColumns * sizeof(float),cudaMemcpyHostToDevice);
+  cudaMemcpy(deviceMaskData, hostMaskData, maskRows * maskColumns * sizeof(float), cudaMemcpyHostToDevice);
+  // cudaMemcpyToSymbol(deviceMaskData, hostMaskData, maskRows * maskColumns * sizeof(float));
   gpuTKTime_stop(Copy, "Copying data to the GPU");
 
   gpuTKTime_start(Compute, "Doing the computation on the GPU");
