@@ -28,8 +28,8 @@ __global__ void convolution(float* inputImage, const float* /* __restrict__ */ m
 	int numChannels = imageChannels;
 
 	//calculate current row, column, and 1-D index
-	int currRow = blockDimY * blockY * threadY;
-	int currColumn = blockDimX * blockX * threadX;
+	int currRow = blockDimY * blockY + threadY;
+	int currColumn = blockDimX * blockX + threadX;
 	//POINTS TO R VALUE OF CURRENT INDEX!!!
 	int index = (currRow * numColumns + currColumn) * numChannels;
 
