@@ -15,8 +15,9 @@
 #define w (TILE_WIDTH + Mask_width - 1)
 #define clamp(x) (min(max((x), 0.0), 1.0))
 
+
 //@@ INSERT CODE HERE
-__global__ void convolution(float* inputImage, const float* /* __restrict__ */ mask, 
+__global__ void convolution(float* inputImage, const float* __restrict__ mask, 
 			    float* outputImage, int imageChannels, int imageWidth,
 			    int imageHeight) {
 
@@ -33,9 +34,18 @@ __global__ void convolution(float* inputImage, const float* /* __restrict__ */ m
 	//POINTS TO R VALUE OF CURRENT INDEX!!!
 	int index = (currRow * numColumns + currColumn) * numChannels;
 
+	//initialize shared tile, 3 represents number of channels
+	__shared__ float tile[TILE_WIDTH][TILE_WIDTH][3];
 	// check if current element is OOB
 	if(currRow < numRows && currColumn < numColumns) {
+		// load elements into shared tile
 		// calculate final value of element
+		for(int k = 0; k < numChannels; k++) {
+			tile[threadX][threadY][k] = inputImage[index + k];
+		}
+		// make sure entire tile is loaded before progressing
+		__syncthreads();
+
 		for(int k = 0; k < numChannels; k++) {
 			float finalVal = 0;
 			for(int x = -1 * (Mask_radius); x <= Mask_radius; x++) {
@@ -46,7 +56,15 @@ __global__ void convolution(float* inputImage, const float* /* __restrict__ */ m
 					float currVal = 0;
 					// check if element is halo element
 					if(indexRow < numRows && indexColumn < numColumns && indexRow >= 0 && indexColumn >= 0) {
-						currVal = inputImage[(indexRow * numColumns + indexColumn) * numChannels + k];
+						//check if element should be loaded from tile or global memory
+						
+						//shared mem. load
+						if(indexRow/TILE_WIDTH == currRow/TILE_WIDTH &&
+					        indexColumn/TILE_WIDTH == currColumn/TILE_WIDTH) {
+							currVal = tile[indexColumn % TILE_WIDTH][indexRow % TILE_WIDTH][k];
+						} else { // global mem. load
+							currVal = inputImage[(indexRow * numColumns + indexColumn) * numChannels + k];
+						}
 					}
 					finalVal += currVal * mask[(y + Mask_radius) * Mask_width + x + Mask_radius];
 				}
